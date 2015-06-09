@@ -27,7 +27,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
-from heelhook import Server, ServerConn, CloseCode
+import heelhook
+from heelhook import Server, ServerConn, CloseCode, LogLevel
 from game import PlayerType, Game, Location
 import sys
 
@@ -35,6 +36,8 @@ try:
     import ujson as json
 except:
     import json
+
+heelhook.set_opts(loglevel=LogLevel.DEBUG_2, log_to_stdout=True)
 
 class GameClient(ServerConn):
     """Messages received from clients:
@@ -70,16 +73,10 @@ class GameClient(ServerConn):
         "type": "joined",
         "board_width": <int>,
         "moves_per_turn": <int>
-    }
-
-    {
-        "type": "end",
-        "win": "<str>"
-    }
-
-    {
-        "type": "end",
-        "loss": "<str>"
+        "shapes": [
+            [[x, y], [x, y], ...],
+            [[x, y], [x, y], ...],
+        ]
     }
 
     {
@@ -111,6 +108,18 @@ class GameClient(ServerConn):
         }
     }
 
+    {
+        "type": "end",
+        "result": "<win|loss>",
+        "reason": <str>
+    }
+
+    {
+        "type": "end",
+        "result": "<win|loss>",
+        "reason": <str>
+    }
+
     """
     STATE_JOINING = 0
     STATE_WAITING = 1
@@ -120,6 +129,11 @@ class GameClient(ServerConn):
         self.state = GameClient.STATE_JOINING
         self.name = ''
         self.session = None
+        print 'ON CONNECT'
+
+    def on_open(self):
+        print 'ON OPEN'
+        #self.send(json.dumps({'hello': 'dummy data'}), is_text=True);
 
     def get_type_and_parse(self, msg, is_text):
         if not is_text:
@@ -157,10 +171,18 @@ class GameClient(ServerConn):
 
             print self.name, 'JOINED, WAITING:', len(self.server.waiting_clients)
 
+            shapes = []
+            for shape in Game.SHAPES:
+                points = []
+                for point in shape.points:
+                    points.append([point.x, point.y])
+                shapes.append(points)
+
             json_dict = {
                 'type': 'joined',
                 'board_width': Game.BOARD_WIDTH,
-                'moves_per_turn': Game.MOVES_PER_TURN
+                'moves_per_turn': Game.MOVES_PER_TURN,
+                'shapes': shapes
             }
             self.send(json.dumps(json_dict), is_text=True)
 
@@ -207,7 +229,8 @@ class GameClient(ServerConn):
                 print 'CURRENT PLAYER OPPONENT'
                 other = self.session.current_player
 
-            json_dict = {'type': 'end', 'win': 'opponent disconnect'}
+            json_dict = {'type': 'end', 'result': 'win',
+                         'reason': 'opponent disconnect'}
             other.send(json.dumps(json_dict), is_text=True)
             other.send_close(CloseCode.NORMAL, reason='game over')
 
@@ -235,7 +258,7 @@ class GameSession(object):
             'moves_remaining': self.moves_remaining,
             'your_color': 'white',
             'opponent': self.black.name,
-            'board': self.game.get_board(PlayerType.WHITE).get_json()
+            'board': self.game.get_board(PlayerType.WHITE).for_json()
         }
         self.white.send(json.dumps(json_dict), is_text=True)
 
@@ -246,7 +269,7 @@ class GameSession(object):
             'moves_remaining': self.moves_remaining,
             'your_color': 'black',
             'opponent': self.white.name,
-            'board': self.game.get_board(PlayerType.BLACK).get_json()
+            'board': self.game.get_board(PlayerType.BLACK).for_json()
         }
         self.black.send(json.dumps(json_dict), is_text=True)
 
@@ -265,11 +288,13 @@ class GameSession(object):
             result_current = 'loss'
             reason_current = lose_reason
 
-        json_dict = {'type': 'end', result_current: reason_current}
+        json_dict = {'type': 'end', 'result': result_current,
+                     'reason': reason_current}
         self.current_player.send(json.dumps(json_dict), is_text=True)
         self.current_player.send_close(CloseCode.NORMAL, reason='game over')
 
-        json_dict = {'type': 'end', result_next: reason_next}
+        json_dict = {'type': 'end', 'result': result_next,
+                     'reason': reason_next}
         self.next_player.send(json.dumps(json_dict), is_text=True)
         self.next_player.send_close(CloseCode.NORMAL, reason='game over')
 
@@ -291,11 +316,11 @@ class GameSession(object):
         }
 
         if not exclusive or exclusive == self.current_player:
-            json_dict['board'] = self.game.get_board(player_type).get_json()
+            json_dict['board'] = self.game.get_board(player_type).for_json()
             self.current_player.send(json.dumps(json_dict), is_text=True)
 
         if not exclusive or exclusive == self.next_player:
-            json_dict['board'] = self.game.get_board(opponent_type).get_json()
+            json_dict['board'] = self.game.get_board(opponent_type).for_json()
             self.next_player.send(json.dumps(json_dict), is_text=True)
 
     def handle(self, player, msg, is_text):
@@ -375,6 +400,6 @@ class GameServer(Server):
 if __name__ == "__main__":
     server = GameServer(port=int(sys.argv[1]), connection_class=GameClient,
 #                        heartbeat_interval_ms=30000, heartbeat_ttl_ms=5000,
-                        debug=True)
+                       )
     server.listen()
 

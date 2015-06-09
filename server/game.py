@@ -180,7 +180,7 @@ class Board(object):
                 self._tiles[loc.x][loc.y] == Board.TILE_PLAYER_WHITE or
                 self._tiles[loc.x][loc.y] == Board.TILE_PLAYER_BOTH)
 
-    def get_json(self):
+    def for_json(self):
         json_dict = {
             'black_block': [],
             'white_block': []
@@ -203,7 +203,7 @@ class Board(object):
                     json_dict['black_player'] = [x, y]
                     json_dict['white_player'] = [x, y]
 
-        return json.dumps(json_dict)
+        return json_dict
 
     def __repr__(self):
         extra_spaces = int(math.log(Game.BOARD_WIDTH, 10)) + 1
@@ -320,6 +320,10 @@ class Game(object):
             if path != None:
                 path.append(Location(cur_x, cur_y))
 
+            tile = self._board.get_tile(origin)
+            if tile == Board.TILE_PLAYER_BOTH:
+                return origin
+
             while delta_x > 0:
                 delta_x -= 1
 
@@ -351,6 +355,10 @@ class Game(object):
 
             if path != None:
                 path.append(Location(cur_x, cur_y))
+
+            tile = self._board.get_tile(origin)
+            if tile == Board.TILE_PLAYER_BOTH:
+                return origin
 
             while delta_y > 0:
                 delta_y -= 1
@@ -467,10 +475,17 @@ class Game(object):
         #print player_type, "FROM:", cur_loc, "TO:", new_loc
         if self._board.valid(new_loc):
             old_value = self._board.get_tile(cur_loc)
+            player_old_value = player.board.get_tile(cur_loc)
+
             if old_value == Board.TILE_PLAYER_BOTH:
                 old_value = opponent.player_tile
             else:
                 old_value = Board.TILE_CLEAR
+
+            if player_old_value == Board.TILE_PLAYER_BOTH:
+                player_old_value = opponent.player_tile
+            else:
+                player_old_value = Board.TILE_CLEAR
 
             value = self._board.get_tile(new_loc)
             player_value = player.board.get_tile(new_loc)
@@ -489,7 +504,8 @@ class Game(object):
                 return False
             else:
                 self._board.set_player_loc(player_type, new_loc, old_value)
-                player.board.set_player_loc(player_type, new_loc, old_value)
+                player.board.set_player_loc(player_type, new_loc,
+                                            player_old_value)
                 return True
         else:
             return False
