@@ -2,7 +2,7 @@
 
 var WIDTH = 1024;
 var BOARD_WIDTH_PIXELS = (5 / 9) * WIDTH;
-var HEIGHT = BOARD_WIDTH_PIXELS + 10;
+var HEIGHT = BOARD_WIDTH_PIXELS + 250;
 
 var BG_COLOR = 0x111111;
 var COLOR_WHITE = 0xFF0000;
@@ -53,7 +53,6 @@ function openWebSocket(wsUri, game) {
         case "joined":
             this.game.headerText.setText("Waiting...");
             this.game.board = new Board(data.board_width, data.moves_per_turn);
-            //this.game.shapes = new ShapeUI(data.shapes);
             break;
         case "start":
         case "update":
@@ -64,14 +63,36 @@ function openWebSocket(wsUri, game) {
                 if (this.game.player === "white") {
                     this.game.color = COLOR_WHITE;
                     this.game.opponent_color = COLOR_BLACK;
+                    this.game.block_color = COLOR_WHITE_BLOCK;
+                    this.game.opponent_block_color = COLOR_BLACK_BLOCK;
                 } else {
                     this.game.color = COLOR_BLACK;
                     this.game.opponent_color = COLOR_WHITE;
+                    this.game.block_color = COLOR_BLACK_BLOCK;
+                    this.game.opponent_block_color = COLOR_WHITE_BLOCK;
                 }
+
+                //this.game.shapeUI = new ShapeUI(data.shapes, COLOR_WHITE_BLOCK, this.game.board.TILE_WIDTH);
+                var pos = new PIXI.Point(5, BOARD_WIDTH_PIXELS + 10);
+
+                var game = this.game;
+                var drawFunc = function() {
+                    game.draw();
+                };
+                var placeFunc = function(shape_index, origin) {
+                    game.place(shape_index, origin.x, origin.y);
+                }
+                var tile_width = this.game.board.TILE_WIDTH - 5;
+                var gap_width = this.game.board.LINE_THICKNESS + 5;
+                this.game.shapeUI = new ShapeUI(data.shapes, this.game.block_color, tile_width, gap_width, pos, this.game.board, drawFunc, placeFunc);
             }
             this.game.started = true;
             this.game.turn = data.turn;
             this.game.movesRemaining = data.moves_remaining;
+
+            if (this.game.shapeUI !== null) {
+                this.game.shapeUI.enabled = (this.game.player === this.game.turn);
+            }
             this.game.update(data.board);
             break;
         case "end":
@@ -98,20 +119,127 @@ function openWebSocket(wsUri, game) {
     return webSocket;
 };
 
-/*function ShapeUI(origin, shapes) {
-    this.origin = origin;
-    this.shapes = shapes;
-    this.BORDER_WIDTH = 15;
+function ShapeUI(shapes, color, tile_width, border_width, offset, board, drawFunc, placeFunc) {
+    //this.shapes = shapes;
+    this.tiles = [];
+    this.draggingTiles =[];
+    this.draggingMouseOffset = new PIXI.Point(0, 0);
+    this.draggingShapeIndex = 0;
+    this.tilesByShape = [];
+    this.tile_width = tile_width;
+    this.border_width = border_width;
+    this.mousePos = new PIXI.Point(0, 0);
+    this.board = board;
+    this.drawFunc = drawFunc;
+    this.placeFunc = placeFunc;
+    this.enabled = true;
+
+    var mouseMove = function(mouse) {
+        this.shapeUI.mousePos.x = mouse.global.x; 
+        this.shapeUI.mousePos.y = mouse.global.y; 
+
+        if (this.shapeUI.draggingTiles.length > 0) {
+            this.shapeUI.drawFunc();
+        }
+    };
+
+    var mouseUp = function(mouse) {
+        var s = this.shapeUI;
+        if (s.draggingTiles.length == 0) {
+            return;
+        }
+
+        s.draggingTiles = [];
+
+        var x = mouse.global.x + s.draggingMouseOffset.x;
+        var y = mouse.global.y + s.draggingMouseOffset.y;
+
+        s.placeFunc(s.draggingShapeIndex, s.board.worldToBoard(new PIXI.Point(x, y)));
+        s.drawFunc();
+    };
+
+    this.container = new PIXI.DisplayObjectContainer();
+    this.container.shapeUI = this;
+    this.container.mousemove = mouseMove;
+    this.container.mouseup = mouseUp;
+    this.container.hitArea = new PIXI.Rectangle(0, 0, 100000, 100000);
+    this.container.interactive = true;
+    stage.addChild(this.container);
 
     if (shapes.length == 0) {
         return;
     }
 
+    var pos = new PIXI.Point(offset.x + border_width, offset.y + border_width);
     var minX = maxX = shapes[0][0][0];
     var minY = maxY = shapes[0][0][1];
-    for (var i = 0; i < this.shapes.length; i++) {
+    for (var i = 0; i < shapes.length; i++) {
         var shape = shapes[i];
+
+        /*
+        tile = new Tile(game, worldPos.x, worldPos.y, color, this.TILE_WIDTH, alpha, dir);
+        tile.interactive = true;
+        this.tiles.push(tile);
+        stage.addChild(tile);
+        */
+        var maxY = 0;
+        var maxX = 0;
+        var shapeList = [];
         for (var j = 0; j < shape.length; j++) {
+            var baseX = (shape[j][0] * (tile_width + border_width));
+            var baseY = (shape[j][1] * (tile_width + border_width));
+
+            var x = pos.x + baseX;
+            var y = pos.y + baseY;
+
+            if (y > maxY) {
+                maxY = y;
+            }
+
+            if (x > maxX) {
+                maxX = x;
+            }
+
+            var mouseDown = function(interactionData) {
+                var s = this.shapeUI;
+                if (!s.enabled) {
+                    return;
+                }
+                //alert(this.shapeIndex.toString() + " " + this.tileIndex.toString());
+                var tilesToCopy = this.shapeUI.tilesByShape[this.shapeIndex];
+                s.draggingTiles = [];
+
+                var x = this.shapeUI.mousePos.x;
+                var y = this.shapeUI.mousePos.y;
+                var mouseOffsetX = tilesToCopy[0].x - x;
+                var mouseOffsetY = tilesToCopy[0].y - y;
+                s.draggingShapeIndex = this.shapeIndex;
+                s.draggingMouseOffset.x = mouseOffsetX;
+                s.draggingMouseOffset.y = mouseOffsetY;
+
+                for (var k = 0; k < tilesToCopy.length; k++) {
+                    var t = tilesToCopy[k];
+                    s.draggingTiles.push(new Tile(t.baseX + mouseOffsetX, t.baseY + mouseOffsetY, COLOR_BOTH, tile_width, 1.0, null, null));
+                }
+            };
+
+            var tile = new Tile(x, y, color, tile_width, 1.0, mouseDown, null);
+            tile.baseX = baseX;
+            tile.baseY = baseY;
+            tile.interactive = true;
+            tile.shapeIndex = i;
+            tile.tileIndex = j;
+            tile.shapeUI = this;
+            this.tiles.push(tile);
+            //this.container.addChild(tile);
+            stage.addChild(tile);
+            shapeList.push(tile);
+        }
+        this.tilesByShape.push(shapeList);
+
+        pos.x = maxX + tile_width + border_width + 50;
+
+        /*for (var j = 0; j < shape.length; j++) {
             var x = shape[j][0];
             var y = shape[j][1];
 
@@ -126,33 +254,26 @@ function openWebSocket(wsUri, game) {
             } else if (y > maxY) {
                 maxY = y;
             }
-        }
-    }
+        }*/
 
-    for (var i = 0; i < this.shapes.length; i++) {
-        var shape = shapes[i];
-        for (var j = 0; j < shape.length; j++) {
-            var x = shape[j][0];
-            var y = shape[j][1];
-
-            if (x < minX) {
-                minX = x;
-            } else if (x > maxX) {
-                maxX = x;
-            }
-
-            if (y < minY) {
-                minY = y;
-            } else if (y > maxY) {
-                maxY = y;
-            }
-        }
     }
 };
 
-ShapeUI.prototype.draw = function(origin) {
+ShapeUI.prototype.draw = function(graphics, origin) {
+    //this.container.x = origin.x;
+    //this.container.y = origin.y;
+    if (!this.enabled) {
+        return;
+    }
+
+    for (var i = 0; i < this.tiles.length; i++) {
+        this.tiles[i].draw(graphics, origin);
+    }
+
+    for (var i = 0; i < this.draggingTiles.length; i++) {
+        this.draggingTiles[i].draw(graphics, this.mousePos);
+    }
 };
-*/
 
 function Game(name) {
     // Key codes
@@ -166,10 +287,12 @@ function Game(name) {
     // game state
     this.name = name;
     this.board = null;
-    this.shapes = null;
+    this.shapeUI = null;
     this.player = null;
     this.color = null;
     this.opponent_color = null;
+    this.block_color = null;
+    this.opponent_block_color = null;
     this.player_pos = null;
     this.turn = null;
     this.turn_number = 0;
@@ -270,6 +393,15 @@ Game.prototype.ping = function(dir) {
     this.ws.send(str);
 };
 
+Game.prototype.place = function(shape_index, x, y) {
+    var str = JSON.stringify({
+        "type": "place",
+        "shape_index": shape_index,
+        "origin": [x, y]
+    });
+    this.ws.send(str);
+};
+
 Game.prototype.addMoveCandidates = function(loc) {
     var dirs = [[1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W'], [0, -1, 'N']];
 
@@ -280,7 +412,7 @@ Game.prototype.addMoveCandidates = function(loc) {
         if (this.board.isValid(testLoc)) {
             var testLocValue = this.board.getPos(testLoc);
             if (testLocValue === Board.TILE_CLEAR) {
-                this.board.setPos(this, testLoc, Board.TILE_MOVE_CANDIDATE, 0.5, dir);
+                this.board.addTile(this, testLoc, Board.TILE_MOVE_CANDIDATE, 0.5, dir);
             }
         }
     }
@@ -290,15 +422,34 @@ Game.prototype.update = function(boardSpec) {
     this.board.clearBoard();
 
     var positions = new Object();
-    positions[PLAYER_NAME_WHITE] = new PIXI.Point(boardSpec.white_player[0], boardSpec.white_player[1]);
-    positions[PLAYER_NAME_BLACK] = new PIXI.Point(boardSpec.black_player[0], boardSpec.black_player[1]);
+
+    if (boardSpec.white_player != null) {
+        positions[PLAYER_NAME_WHITE] = new PIXI.Point(boardSpec.white_player[0], boardSpec.white_player[1]);
+    } else {
+        positions[PLAYER_NAME_WHITE] = new PIXI.Point(-1, -1);
+    }
+    if (boardSpec.black_player != null) {
+        positions[PLAYER_NAME_BLACK] = new PIXI.Point(boardSpec.black_player[0], boardSpec.black_player[1]);
+    } else {
+        positions[PLAYER_NAME_BLACK] = new PIXI.Point(-1, -1);
+    }
 
     if (positions[PLAYER_NAME_WHITE].x === positions[PLAYER_NAME_BLACK].x &&
         positions[PLAYER_NAME_WHITE].y === positions[PLAYER_NAME_BLACK].y) {
-        this.board.setPos(this, positions[PLAYER_NAME_WHITE], Board.TILE_PLAYER_BOTH);
+        this.board.addTile(this, positions[PLAYER_NAME_WHITE], Board.TILE_PLAYER_BOTH, 1.0, null);
     } else {
-        this.board.setPos(this, positions[PLAYER_NAME_WHITE], Board.TILE_PLAYER_WHITE);
-        this.board.setPos(this, positions[PLAYER_NAME_BLACK], Board.TILE_PLAYER_BLACK);
+        this.board.addTile(this, positions[PLAYER_NAME_WHITE], Board.TILE_PLAYER_WHITE, 1.0, null);
+        this.board.addTile(this, positions[PLAYER_NAME_BLACK], Board.TILE_PLAYER_BLACK, 1.0, null);
+    }
+
+    for (var i = 0; i < boardSpec.white_block.length; i++) {
+        var pos = new PIXI.Point(boardSpec.white_block[i][0], boardSpec.white_block[i][1]);
+        this.board.addTile(this, pos, Board.TILE_BLOCK_WHITE, 1.0, null);
+    }
+
+    for (var i = 0; i < boardSpec.black_block.length; i++) {
+        var pos = new PIXI.Point(boardSpec.black_block[i][0], boardSpec.black_block[i][1]);
+        this.board.addTile(this, pos, Board.TILE_BLOCK_BLACK, 1.0, null);
     }
 
     if (this.player === this.turn) {
@@ -353,10 +504,16 @@ Game.prototype.draw = function() {
         } else {
             this.moveText.setText(curMove);
         }
+
+        if (this.shapeUI !== null) {
+            //var pos = new PIXI.Point(5, BOARD_WIDTH_PIXELS + 10);
+            //this.shapeUI.draw(this.graphics, pos);
+            this.shapeUI.draw(this.graphics);
+        }
     }
 };
 
-function Tile(game, x, y, color, width, alpha, dir) {
+function Tile(x, y, color, width, alpha, mouseDown, mouseUp) {
     PIXI.DisplayObjectContainer.call(this);
 
     // This appears to be required for PIXI?
@@ -366,44 +523,51 @@ function Tile(game, x, y, color, width, alpha, dir) {
         alpha = 1;
     }
 
-    if (dir === undefined) {
+    /*if (dir === undefined) {
         this.dir = null;
     } else {
         this.dir = dir;
-    }
+    }*/
 
     this.x = x;
     this.y = y;
     this.tile_width = width;
     this.color = color;
     this.alpha = alpha;
-    this.game = game;
+    this.mousedown = mouseDown;
+    this.mouseup = mouseUp;
 
     // Inherited from DisplayObject
     this.hitArea = new PIXI.Rectangle(0, 0, this.tile_width, this.tile_width);
-
-    if (dir !== null) {
-        this.mousedown = function(interactionData) {
-            if (this.dir !== null) {
-                this.game.move(this.dir);    
-            }
-        };
-    }
 };
 
 Tile.prototype = Object.create(PIXI.DisplayObjectContainer.prototype);
 Tile.prototype.constructor = Tile;
 
-Tile.prototype.draw = function(graphics) {
+Tile.prototype.draw = function(graphics, offset) {
     graphics.lineStyle(1, this.color, this.alpha);
 
+    if (offset === undefined) {
+        offset = new PIXI.Point(0, 0);
+    }
+
+    // THIS DOESN'T APPEAR TO MOVE THE HIT AREA... FIGURE OUT HOW TO DO THAT???
+
+    var pos = new PIXI.Point(offset.x + this.x, offset.y + this.y);
+
     graphics.beginFill(this.color, this.alpha);
-    graphics.moveTo(this.x, this.y);
-    graphics.lineTo(this.x + this.tile_width, this.y);
-    graphics.lineTo(this.x + this.tile_width, this.y + this.tile_width);
-    graphics.lineTo(this.x, this.y + this.tile_width);
-    graphics.lineTo(this.x, this.y);
+    graphics.moveTo(pos.x, pos.y);
+    graphics.lineTo(pos.x + this.tile_width, pos.y);
+    graphics.lineTo(pos.x + this.tile_width, pos.y + this.tile_width);
+    graphics.lineTo(pos.x, pos.y + this.tile_width);
+    graphics.lineTo(pos.x, pos.y);
     graphics.endFill();
+}
+
+//function DirectionTile
+
+function UITile(game, x, y, color, width, alpha, mousedown) {
+
 }
 
 function Board(boardWidth, movesPerTurn) {
@@ -453,17 +617,6 @@ Board.prototype.clearBoard = function() {
     }
 };
 
-Board.prototype.addTile = function(game, boardPos, color, alpha, dir) {
-    if (alpha === undefined) {
-        alpha = 1;
-    }
-    worldPos = this.boardToWorld(boardPos);
-    tile = new Tile(game, worldPos.x, worldPos.y, color, this.TILE_WIDTH, alpha, dir);
-    tile.interactive = true;
-    this.tiles.push(tile);
-    stage.addChild(tile);
-};
-
 /*Board.prototype.clearPos = function(pos) {
     if (pos !== null) {
         this.board[pos.x][pos.y] = Board.TILE_CLEAR;
@@ -474,9 +627,24 @@ Board.prototype.getPos = function(pos) {
     return this.board[pos.x][pos.y];
 };
 
-Board.prototype.setPos = function(game, pos, value, alpha, dir) {
+Board.prototype.addTile = function(game, pos, value, alpha, dir) {
+    if (pos.x < 0 || pos.y < 0) {
+        return;
+    }
+
     this.board[pos.x][pos.y] = value;
-    this.addTile(game, pos, this.colors[value], alpha, dir);
+
+    worldPos = this.boardToWorld(pos);
+    var mouseDown = null;
+    if (dir != null) {
+        mouseDown = function(interactionData) {
+            game.move(dir);    
+        };
+    }
+    var tile = new Tile(worldPos.x, worldPos.y, this.colors[value], this.TILE_WIDTH, alpha, mouseDown, null);
+    tile.interactive = true;
+    this.tiles.push(tile);
+    stage.addChild(tile);
 };
 
 Board.prototype.isValid = function(loc) {
@@ -488,6 +656,13 @@ Board.prototype.boardToWorld = function(pos) {
     var offset = this.LINE_THICKNESS / 2;
     return new PIXI.Point(pos.x * this.GRID_WIDTH + this.ORIGIN.x + offset, pos.y * this.GRID_WIDTH + this.ORIGIN.y + offset); 
 };
+
+Board.prototype.worldToBoard = function(pos) {
+    var offset = this.LINE_THICKNESS / 2;
+    var x = Math.round((pos.x - this.ORIGIN.x - offset) / this.GRID_WIDTH);
+    var y = Math.round((pos.y - this.ORIGIN.y - offset) / this.GRID_WIDTH);
+    return new PIXI.Point(x, y);
+}
 
 Board.prototype.drawSquare = function(worldPos, color, graphics) {
 
