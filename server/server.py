@@ -73,10 +73,6 @@ class GameClient(ServerConn):
         "type": "joined",
         "board_width": <int>,
         "moves_per_turn": <int>
-        "shapes": [
-            [[x, y], [x, y], ...],
-            [[x, y], [x, y], ...],
-        ]
     }
 
     {
@@ -86,6 +82,10 @@ class GameClient(ServerConn):
         "moves_remaining": <int>,
         "your_color": "<white|black>",
         "opponent": <str>,
+        "shapes": [
+            [[x, y], [x, y], ...],
+            [[x, y], [x, y], ...],
+        ]
         "board": {
             "white_player": [x, y],
             "black_player": [x, y],
@@ -133,7 +133,7 @@ class GameClient(ServerConn):
 
     def on_open(self):
         print 'ON OPEN'
-        #self.send(json.dumps({'hello': 'dummy data'}), is_text=True);
+        self.send(json.dumps({'hello': 'dummy data'}), is_text=True);
 
     def get_type_and_parse(self, msg, is_text):
         if not is_text:
@@ -171,18 +171,10 @@ class GameClient(ServerConn):
 
             print self.name, 'JOINED, WAITING:', len(self.server.waiting_clients)
 
-            shapes = []
-            for shape in Game.SHAPES:
-                points = []
-                for point in shape.points:
-                    points.append([point.x, point.y])
-                shapes.append(points)
-
             json_dict = {
                 'type': 'joined',
                 'board_width': Game.BOARD_WIDTH,
-                'moves_per_turn': Game.MOVES_PER_TURN,
-                'shapes': shapes
+                'moves_per_turn': Game.MOVES_PER_TURN
             }
             self.send(json.dumps(json_dict), is_text=True)
 
@@ -251,6 +243,14 @@ class GameSession(object):
 
     def start(self):
         print 'STARTING!!!!'
+
+        shapes = []
+        for shape in Game.SHAPES:
+            points = []
+            for point in shape.points:
+                points.append([point.x, point.y])
+            shapes.append(points)
+
         json_dict = {
             'type': 'start',
             'turn': 'white',
@@ -258,6 +258,7 @@ class GameSession(object):
             'moves_remaining': self.moves_remaining,
             'your_color': 'white',
             'opponent': self.black.name,
+            'shapes': shapes,
             'board': self.game.get_board(PlayerType.WHITE).for_json()
         }
         self.white.send(json.dumps(json_dict), is_text=True)
@@ -269,6 +270,7 @@ class GameSession(object):
             'moves_remaining': self.moves_remaining,
             'your_color': 'black',
             'opponent': self.white.name,
+            'shapes': shapes,
             'board': self.game.get_board(PlayerType.BLACK).for_json()
         }
         self.black.send(json.dumps(json_dict), is_text=True)

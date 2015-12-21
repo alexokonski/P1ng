@@ -74,10 +74,10 @@ class PlayerType(object):
 #
 LONG_SHAPE_0 = Shape(
     points = [
-        Offset(-1, 0),
         Offset(0, 0),
         Offset(1, 0),
-        Offset(2, 0)
+        Offset(2, 0),
+        Offset(3, 0)
     ]
 )
 
@@ -89,10 +89,10 @@ LONG_SHAPE_0 = Shape(
 #
 LONG_SHAPE_1 = Shape(
     points = [
-        Offset(0, 2),
-        Offset(0, 1),
         Offset(0, 0),
-        Offset(0, -1)
+        Offset(0, 1),
+        Offset(0, 2),
+        Offset(0, 3)
     ]
 )
 
@@ -112,9 +112,9 @@ BOX_SHAPE = Shape(
 SHAPES_STR =\
 """
       (1)
-       X   (2)
-(0)    1   2X
-X0XX   X   XX
+       1   (2)
+(0)    X   2X
+0XXX   X   XX
        X
 """[1:]
 
