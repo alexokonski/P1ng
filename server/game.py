@@ -38,23 +38,34 @@ except:
 
 class Location(object):
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self._x = x
+        self._y = y
+
+    @property
+    def x(self):
+        return self._x;
+
+    @property
+    def y(self):
+        return self._y;
 
     def __add__(self, other):
-        return Location(self.x + other.x, self.y + other.y)
+        return Location(self._x + other._x, self._y + other._y)
 
     def __str__(self):
-        return "(%d, %d)" % (self.x, self.y)
+        return "(%d, %d)" % (self._x, self._y)
 
     def __repr__(self):
-        return "Location(%d, %d)" % (self.x, self.y)
+        return "Location(%d, %d)" % (self._x, self._y)
 
     def __eq__(self, other):
-        return (self.x == other.x and self.y == other.y)
+        return (self._x == other._x and self._y == other._y)
 
     def __ne__(self, other):
         return not (self == other)
+
+    def __hash__(self):
+        return (self._x ^ self._y)
 
 # Alias for Location
 Offset = Location
@@ -448,7 +459,6 @@ class Game(object):
                 tile = self._board.get_tile(loc)
                 see_tile = player.board.get_tile(loc)
                 if tile == player.player_tile:
-                    assert player_tile == tile
                     continue
                 elif tile == opponent.player_tile:
                     if see_tile == tile:
