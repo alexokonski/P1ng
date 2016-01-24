@@ -11,6 +11,8 @@ var COLOR_BLACK = 0x0000FF;
 var COLOR_BLACK_BLOCK = 0x000080;
 var COLOR_BOTH = 0x800080;
 var COLOR_CANDIDATE = 0x333333;
+var COLOR_WHITE_PLACEMENT = 0x220000;
+var COLOR_BLACK_PLACEMENT = 0x000022;
 
 var PLAYER_NAME_WHITE = 'white';
 var PLAYER_NAME_BLACK = 'black';
@@ -65,12 +67,21 @@ function openWebSocket(wsUri, game) {
                     this.game.opponent_color = COLOR_BLACK;
                     this.game.block_color = COLOR_WHITE_BLOCK;
                     this.game.opponent_block_color = COLOR_BLACK_BLOCK;
+                    this.game.placement_zone_tile = Board.TILE_PLACEMENT_ZONE_WHITE;
                 } else {
                     this.game.color = COLOR_BLACK;
                     this.game.opponent_color = COLOR_WHITE;
                     this.game.block_color = COLOR_BLACK_BLOCK;
                     this.game.opponent_block_color = COLOR_WHITE_BLOCK;
+                    this.game.placement_zone_tile = Board.TILE_PLACEMENT_ZONE_BLACK;
                 }
+
+                this.game.placement_zone = new PIXI.Rectangle(
+                    data.placement_zone.upperleft[0],
+                    data.placement_zone.upperleft[1],
+                    data.placement_zone.width,
+                    data.placement_zone.height
+                );
 
                 //this.game.shapeUI = new ShapeUI(data.shapes, COLOR_WHITE_BLOCK, this.game.board.TILE_WIDTH);
                 var pos = new PIXI.Point(5, BOARD_WIDTH_PIXELS + 10);
@@ -293,12 +304,14 @@ function Game(name) {
     this.opponent_color = null;
     this.block_color = null;
     this.opponent_block_color = null;
+    this.placement_zone_color = null;
     this.player_pos = null;
     this.turn = null;
     this.turn_number = 0;
     this.movesRemaining = 0;
     this.started = false;
     this.gameOver = false;
+    this.placement_zone = null;
 
     // websocket stuff
     var hostname = window.location.hostname;
@@ -418,6 +431,21 @@ Game.prototype.addMoveCandidates = function(loc) {
     }
 };
 
+Game.prototype.addPlacementZone = function(type) {
+    var maxX = this.placement_zone.x + this.placement_zone.width;
+    var maxY = this.placement_zone.y + this.placement_zone.height;
+
+    for (var x = this.placement_zone.x; x < maxX; x++) {
+        for (var y = this.placement_zone.y; y < maxY; y++) {
+            var loc = new PIXI.Point(x, y);
+            var value = this.board.getPos(loc);
+            if (value === Board.TILE_CLEAR) {
+                this.board.addTile(this, loc, type, 1.0);
+            }
+        }
+    }
+};
+
 Game.prototype.update = function(boardSpec) {
     this.board.clearBoard();
 
@@ -455,6 +483,8 @@ Game.prototype.update = function(boardSpec) {
     if (this.player === this.turn) {
         this.addMoveCandidates(positions[this.player]);
     }
+
+    this.addPlacementZone(this.placement_zone_tile);
 }
 
 Game.prototype.draw = function() {
@@ -578,6 +608,8 @@ function Board(boardWidth, movesPerTurn) {
     Board.TILE_PLAYER_WHITE = 4;
     Board.TILE_PLAYER_BOTH = 5;
     Board.TILE_MOVE_CANDIDATE = 6;
+    Board.TILE_PLACEMENT_ZONE_WHITE = 7;
+    Board.TILE_PLACEMENT_ZONE_BLACK = 8;
 
     this.BOARD_WIDTH = boardWidth;
     this.MOVES_PER_TURN = movesPerTurn;
@@ -594,6 +626,8 @@ function Board(boardWidth, movesPerTurn) {
     this.colors[Board.TILE_PLAYER_WHITE] = COLOR_WHITE;
     this.colors[Board.TILE_PLAYER_BOTH] = COLOR_BOTH;
     this.colors[Board.TILE_MOVE_CANDIDATE] = COLOR_CANDIDATE;
+    this.colors[Board.TILE_PLACEMENT_ZONE_WHITE] = COLOR_WHITE_PLACEMENT;
+    this.colors[Board.TILE_PLACEMENT_ZONE_BLACK] = COLOR_BLACK_PLACEMENT;
 
     this.tiles = [];
     this.board = [];

@@ -31,13 +31,14 @@ import heelhook
 from heelhook import Server, ServerConn, CloseCode, LogLevel
 from game import PlayerType, Game, Location
 import sys
+import traceback
 
 try:
     import ujson as json
 except:
     import json
 
-heelhook.set_opts(loglevel=LogLevel.DEBUG_2, log_to_stdout=True)
+heelhook.set_opts(loglevel=LogLevel.DEBUG_3, log_to_stdout=True)
 
 class GameClient(ServerConn):
     """Messages received from clients:
@@ -85,12 +86,17 @@ class GameClient(ServerConn):
         "shapes": [
             [[x, y], [x, y], ...],
             [[x, y], [x, y], ...],
-        ]
+        ],
         "board": {
             "white_player": [x, y],
             "black_player": [x, y],
             "white_block" : [[x, y], [x, y], ...],
             "black_block" : [[x, y], [x, y], ...]
+        },
+        "placement_zone": {
+            "upperleft": [x, y],
+            "width": <int>,
+            "height": <int>
         }
     }
 
@@ -259,7 +265,8 @@ class GameSession(object):
             'your_color': 'white',
             'opponent': self.black.name,
             'shapes': shapes,
-            'board': self.game.get_board(PlayerType.WHITE).for_json()
+            'board': self.game.get_board(PlayerType.WHITE).for_json(),
+            'placement_zone': self.game.get_zone_for_json(PlayerType.WHITE)
         }
         self.white.send(json.dumps(json_dict), is_text=True)
 
@@ -271,7 +278,8 @@ class GameSession(object):
             'your_color': 'black',
             'opponent': self.white.name,
             'shapes': shapes,
-            'board': self.game.get_board(PlayerType.BLACK).for_json()
+            'board': self.game.get_board(PlayerType.BLACK).for_json(),
+            'placement_zone': self.game.get_zone_for_json(PlayerType.BLACK)
         }
         self.black.send(json.dumps(json_dict), is_text=True)
 
@@ -372,6 +380,7 @@ class GameSession(object):
             else:
                 raise ValueError("Invalid type: %s" % (type,))
         except (KeyError, ValueError) as e:
+            #print "DEBUG TRACEBACK: ", traceback.format_exc()
             self.send_end(self.next_player, 'opponent disconnect',
                           'invalid data')
             return

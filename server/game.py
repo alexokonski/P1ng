@@ -70,11 +70,25 @@ class Location(object):
 # Alias for Location
 Offset = Location
 
+class Rectangle(object):
+    def __init__(self, upperleft, width, height):
+        self.upperleft = upperleft
+        self.width = width
+        self.height = height
+
+    def contains(self, point):
+        res = (point.x >= self.upperleft.x and point.y >= self.upperleft.y\
+                and point.x <= (self.upperleft.x + self.width)\
+                and point.y <= (self.upperleft.y + self.height))
+        print 'IS', point, 'IN', self.upperleft, ',',\
+                self.width, ',', self.height, ":", res
+
+        return res
+
 ShapeOffset = namedtuple('ShapeOffset', ['x', 'y', 'corner'])
 Shape = namedtuple('Shape', ['points'])
 Player = namedtuple('Player', ['board', 'invis_tiles', 'block_tile',
-                               'player_tile',
-                               'player_type'])
+                               'player_tile', 'player_type', 'placement_zone'])
 
 class PlayerType(object):
     WHITE = 0
@@ -253,7 +267,7 @@ class Board(object):
 
 
 class Game(object):
-    BOARD_WIDTH = 13
+    BOARD_WIDTH = 12
     SHOOT_RADIUS = 3
     MOVES_PER_TURN = 2
 
@@ -275,6 +289,8 @@ class Game(object):
         # master board
         self._board = Board()
 
+        half_width = Game.BOARD_WIDTH / 2
+
         # players, with their own view of the world
         self._players = [
             Player(
@@ -282,22 +298,28 @@ class Game(object):
                 invis_tiles=set(),
                 block_tile=Board.TILE_BLOCK_WHITE,
                 player_tile=Board.TILE_PLAYER_WHITE,
-                player_type=PlayerType.WHITE
+                player_type=PlayerType.WHITE,
+                placement_zone=Rectangle(
+                    Location(0, half_width),
+                    Game.BOARD_WIDTH,
+                    half_width
+                )
             ),
             Player(
                 board=Board(),
                 invis_tiles=set(),
                 block_tile=Board.TILE_BLOCK_BLACK,
                 player_tile=Board.TILE_PLAYER_BLACK,
-                player_type=PlayerType.BLACK
+                player_type=PlayerType.BLACK,
+                placement_zone=Rectangle(
+                    Location(0, 0),
+                    Game.BOARD_WIDTH,
+                    half_width
+                )
             )
         ]
 
         self._turn = 0
-
-        last = Game.BOARD_WIDTH - 1
-        self._corners = [Location(0, 0), Location(last, 0),
-                         Location(last, last), Location(0, last)]
 
     def _get_player(self, player_type):
         return self._players[player_type]
@@ -454,7 +476,7 @@ class Game(object):
         tile_placed = False
         for offset in shape.points:
             loc = origin + offset
-            if self._board.valid(loc):
+            if self._board.valid(loc) and player.placement_zone.contains(loc):
                 tile_placed = True
                 tile = self._board.get_tile(loc)
                 see_tile = player.board.get_tile(loc)
@@ -556,6 +578,15 @@ class Game(object):
     def get_board(self, player_type):
         player = self._get_player(player_type)
         return player.board
+
+    def get_zone_for_json(self, player_type):
+        zone = self._get_player(player_type).placement_zone
+        zone_dict = {
+            'upperleft': [zone.upperleft.x, zone.upperleft.y],
+            'width': zone.width,
+            'height': zone.height
+        }
+        return zone_dict
 
     def __str__(self):
         s = "BOARD:\n"
