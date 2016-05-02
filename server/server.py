@@ -139,7 +139,7 @@ class GameClient(ServerConn):
 
     def on_open(self):
         print 'ON OPEN'
-        self.send(json.dumps({'hello': 'dummy data'}), is_text=True);
+        #self.send(json.dumps({'hello': 'dummy data'}), is_text=True);
 
     def get_type_and_parse(self, msg, is_text):
         if not is_text:

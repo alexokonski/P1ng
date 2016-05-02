@@ -19,3 +19,7 @@
 
 # Vim swap failes
 *.swp
+
+# Keys
+*.pem
+*.pfx

@@ -78,8 +78,8 @@ class Rectangle(object):
 
     def contains(self, point):
         res = (point.x >= self.upperleft.x and point.y >= self.upperleft.y\
-                and point.x <= (self.upperleft.x + self.width)\
-                and point.y <= (self.upperleft.y + self.height))
+                and point.x < (self.upperleft.x + self.width)\
+                and point.y < (self.upperleft.y + self.height))
         print 'IS', point, 'IN', self.upperleft, ',',\
                 self.width, ',', self.height, ":", res
 
@@ -267,7 +267,7 @@ class Board(object):
 
 
 class Game(object):
-    BOARD_WIDTH = 12
+    BOARD_WIDTH = 14
     SHOOT_RADIUS = 3
     MOVES_PER_TURN = 2
 
@@ -290,6 +290,13 @@ class Game(object):
         self._board = Board()
 
         half_width = Game.BOARD_WIDTH / 2
+        border_width = Game.BOARD_WIDTH / 5
+
+        placement_zone = Rectangle(
+            Location(border_width, border_width),
+            Game.BOARD_WIDTH - border_width * 2,
+            Game.BOARD_WIDTH - border_width * 2
+        )
 
         # players, with their own view of the world
         self._players = [
@@ -299,11 +306,7 @@ class Game(object):
                 block_tile=Board.TILE_BLOCK_WHITE,
                 player_tile=Board.TILE_PLAYER_WHITE,
                 player_type=PlayerType.WHITE,
-                placement_zone=Rectangle(
-                    Location(0, half_width),
-                    Game.BOARD_WIDTH,
-                    half_width
-                )
+                placement_zone=placement_zone
             ),
             Player(
                 board=Board(),
@@ -311,11 +314,7 @@ class Game(object):
                 block_tile=Board.TILE_BLOCK_BLACK,
                 player_tile=Board.TILE_PLAYER_BLACK,
                 player_type=PlayerType.BLACK,
-                placement_zone=Rectangle(
-                    Location(0, 0),
-                    Game.BOARD_WIDTH,
-                    half_width
-                )
+                placement_zone=placement_zone
             )
         ]
 

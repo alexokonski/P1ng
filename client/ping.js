@@ -1,23 +1,25 @@
 // Stuff
 
-var WIDTH = 1024;
+var WIDTH = 900;
 var BOARD_WIDTH_PIXELS = (5 / 9) * WIDTH;
 var HEIGHT = BOARD_WIDTH_PIXELS + 250;
 
-var BG_COLOR = 0x111111;
+var BG_COLOR = 0x101010;
 var COLOR_WHITE = 0xFF0000;
 var COLOR_WHITE_BLOCK = 0x800000;
 var COLOR_BLACK = 0x0000FF;
 var COLOR_BLACK_BLOCK = 0x000080;
 var COLOR_BOTH = 0x800080;
 var COLOR_CANDIDATE = 0x333333;
-var COLOR_WHITE_PLACEMENT = 0x220000;
-var COLOR_BLACK_PLACEMENT = 0x000022;
+var COLOR_WHITE_PLACEMENT = 0x333333;
+var COLOR_BLACK_PLACEMENT = 0x333333;
 
 var PLAYER_NAME_WHITE = 'white';
 var PLAYER_NAME_BLACK = 'black';
 
 var renderer = PIXI.autoDetectRenderer(WIDTH, HEIGHT);
+
+var font = {font:"25px Courier New", stroke:"#00CC00", fill:"#00CC00", align: "center"};
 
 var stage = new PIXI.Stage(BG_COLOR);
 
@@ -84,7 +86,8 @@ function openWebSocket(wsUri, game) {
                 );
 
                 //this.game.shapeUI = new ShapeUI(data.shapes, COLOR_WHITE_BLOCK, this.game.board.TILE_WIDTH);
-                var pos = new PIXI.Point(5, BOARD_WIDTH_PIXELS + 10);
+                //var pos = new PIXI.Point(5, BOARD_WIDTH_PIXELS + 10);
+                var pos = new PIXI.Point(BOARD_WIDTH_PIXELS + 10, 250);
 
                 var game = this.game;
                 var drawFunc = function() {
@@ -187,12 +190,6 @@ function ShapeUI(shapes, color, tile_width, border_width, offset, board, drawFun
     for (var i = 0; i < shapes.length; i++) {
         var shape = shapes[i];
 
-        /*
-        tile = new Tile(game, worldPos.x, worldPos.y, color, this.TILE_WIDTH, alpha, dir);
-        tile.interactive = true;
-        this.tiles.push(tile);
-        stage.addChild(tile);
-        */
         var maxY = 0;
         var maxX = 0;
         var shapeList = [];
@@ -216,7 +213,7 @@ function ShapeUI(shapes, color, tile_width, border_width, offset, board, drawFun
                 if (!s.enabled) {
                     return;
                 }
-                //alert(this.shapeIndex.toString() + " " + this.tileIndex.toString());
+
                 var tilesToCopy = this.shapeUI.tilesByShape[this.shapeIndex];
                 s.draggingTiles = [];
 
@@ -230,7 +227,7 @@ function ShapeUI(shapes, color, tile_width, border_width, offset, board, drawFun
 
                 for (var k = 0; k < tilesToCopy.length; k++) {
                     var t = tilesToCopy[k];
-                    s.draggingTiles.push(new Tile(t.baseX + mouseOffsetX, t.baseY + mouseOffsetY, COLOR_BOTH, tile_width, 1.0, null, null));
+                    s.draggingTiles.push(new Tile(t.baseX + mouseOffsetX, t.baseY + mouseOffsetY, color, tile_width, 1.0, null, null));
                 }
             };
 
@@ -242,31 +239,17 @@ function ShapeUI(shapes, color, tile_width, border_width, offset, board, drawFun
             tile.tileIndex = j;
             tile.shapeUI = this;
             this.tiles.push(tile);
-            //this.container.addChild(tile);
             stage.addChild(tile);
             shapeList.push(tile);
         }
         this.tilesByShape.push(shapeList);
 
-        pos.x = maxX + tile_width + border_width + 50;
-
-        /*for (var j = 0; j < shape.length; j++) {
-            var x = shape[j][0];
-            var y = shape[j][1];
-
-            if (x < minX) {
-                minX = x;
-            } else if (x > maxX) {
-                maxX = x;
-            }
-
-            if (y < minY) {
-                minY = y;
-            } else if (y > maxY) {
-                maxY = y;
-            }
-        }*/
-
+        if (pos.x + (4 * tile_width) < WIDTH) {
+            pos.x = maxX + tile_width + border_width + 50;
+        } else {
+            pos.x = offset.x + border_width;
+            pos.y += 3 * tile_width;
+        }
     }
 };
 
@@ -316,7 +299,7 @@ function Game(name) {
     // websocket stuff
     var hostname = window.location.hostname;
     var port = "9001";
-    var wsUri = "ws://" + hostname + ":" + port + "/";
+    var wsUri = "wss://" + hostname + ":" + port + "/";
     this.ws = openWebSocket(wsUri, this);
     this.ws.binaryType = "arraybuffer";
 
@@ -324,7 +307,7 @@ function Game(name) {
     this.graphics = new PIXI.Graphics();
     this.turnText = null;
     this.moveText = null;
-    this.headerText = new PIXI.Text("Joining...", {font:"bold 30px Courier New", stroke:"#00CC00", fill:"#00CC00", align: "center"});
+    this.headerText = new PIXI.Text("Joining...", font);
     this.headerText.position.x = BOARD_WIDTH_PIXELS + (WIDTH - BOARD_WIDTH_PIXELS) / 2;
     this.headerText.position.y = 30;
     this.headerText.anchor.x = 0.5;
@@ -505,7 +488,7 @@ Game.prototype.draw = function() {
         var yDelta = 75;
         var info = "Turn:";
         if (this.turnText === null) {
-            this.turnText = new PIXI.Text(info, {font:"bold 30px Courier New", stroke:"#00CC00", fill:"#00CC00", align: "center"});
+            this.turnText = new PIXI.Text(info, font);
             this.turnText.position.x = this.headerText.position.x;
             this.turnText.position.y = this.headerText.y + yDelta;
             this.turnText.anchor.x = 0.5;
@@ -526,7 +509,7 @@ Game.prototype.draw = function() {
         this.board.drawSquare(pos, color, this.graphics);
 
         if (this.moveText === null) {
-            this.moveText = new PIXI.Text(curMove, {font:"bold 30px Courier New", stroke:"#00CC00", fill:"#00CC00", align: "center"});
+            this.moveText = new PIXI.Text(curMove, font);
             this.moveText.position.x = textX;
             this.moveText.position.y = this.turnText.y + yDelta;
             this.moveText.anchor.x = 0.5;
